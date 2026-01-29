@@ -881,6 +881,14 @@ class QHFSSRenderer(QAnsysRenderer):
                                       type=type,
                                       save_fields=save_fields)
 
+    # JK, 2025.10
+    def delete_sweep(self,
+                    setup_name="Setup",
+                    sweep_name="Sweep"):  
+        if self.pinfo:
+            setup = self.pinfo.get_setup(setup_name)
+            setup.delete_sweep(sweep_name)
+
     def analyze_sweep(self, sweep_name: str, setup_name: str):
         """Analyze a single sweep within the setup.
 

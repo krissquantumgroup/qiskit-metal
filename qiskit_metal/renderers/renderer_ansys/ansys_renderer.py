@@ -830,6 +830,10 @@ class QAnsysRenderer(QRendererAnalysis):
                     )
                     if current_solution_type == "q3d":
                         current_solution_type = "capacitive"
+
+                    # if current_solution_type == "hfss modal network": # JK
+                    #     current_solution_type = "drivenmodal"  # JK
+
                     if (current_solution_type != solution_type and
                             solution_type is not None):
                         self.logger.warning(
@@ -884,6 +888,8 @@ class QAnsysRenderer(QRendererAnalysis):
                     setup = self.add_eigenmode_setup(name, **other_setup)
                 elif self.pinfo.design.solution_type == "DrivenModal":
                     setup = self.add_drivenmodal_setup(name, **other_setup)
+                elif self.pinfo.design.solution_type == "HFSS Modal Network": # JK This is what HFSS solution type in GUI is.
+                    setup = self.add_drivenmodal_setup(name, **other_setup) #JK
                 elif self.pinfo.design.solution_type == "Q3D":
                     setup = self.add_q3d_setup(name, **other_setup)
         return setup
@@ -936,7 +942,7 @@ class QAnsysRenderer(QRendererAnalysis):
         or make new setup with default name.
 
         Args:
-            setup_name (str, optional): If name exists for setup, then have pinfo reference it.
+            setup_name (str, optional): If name exists for setup, then have  pinfo reference it.
               If name for setup does not exist, create a new setup with the name.
               If name is None, create a new setup with default name.
         """

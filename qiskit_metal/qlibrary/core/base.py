@@ -136,7 +136,7 @@ class QComponent():
 
     # Dummy private attribute used to check if an instantiated object is
     # indeed a QComponent class. The problem is that the `isinstance`
-    # built-in method fails when this module is reloaded.
+    # built-in method fails when this module is reloaded.0
     # Used by `is_component` to check.
     __i_am_component__ = True
 

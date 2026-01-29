@@ -11,6 +11,15 @@
 # Any modifications or derivative works of this code must retain this
 # copyright notice, and modified files need to carry a notice indicating
 # that they have been altered from the originals.
+
+
+# LIM SONG BIN: I added the code "chip=chip" that was in the TransmonPocket Class.
+# in the make_pocket(), make_connection_pad() METHOD,
+# chip = p.chip
+# self.add_qgeometry('path', {f'{name}_wire_sub': connector_wire_path},
+#                     width=cpw_width + 2 * pc.cpw_gap,
+#                     subtract=True,
+#                     !@#$chip=chip!@#$)
 """Transmon Pocket 6.
 
 .. code-block::
@@ -35,7 +44,7 @@ from qiskit_metal import draw, Dict
 from qiskit_metal.qlibrary.core import BaseQubit
 
 
-class TransmonPocket6(BaseQubit):
+class TransmonPocket6_LSB(BaseQubit):
     """Transmon pocket with 6 connection pads.
 
     Inherits `BaseQubit` class
@@ -160,6 +169,9 @@ class TransmonPocket6(BaseQubit):
         # self.p allows us to directly access parsed values (string -> numbers) form the user option
         p = self.p
 
+        # extract chip name
+        chip = p.chip
+
         # since we will reuse these options, parse them once and define them as variables
         pad_width = p.pad_width
         pad_height = p.pad_height
@@ -167,29 +179,6 @@ class TransmonPocket6(BaseQubit):
 
         # make the pads as rectangles (shapely polygons)
         pad = draw.rectangle(pad_width, pad_height)
-
-
-        ################# JK
-        from shapely.geometry import CAP_STYLE, JOIN_STYLE, Point, Polygon
-        pad = draw.scale(pad, 
-                         xfact=((pad_width-0.01*2)/pad_width), 
-                         yfact=((pad_height-0.01*2)/pad_height), overwrite=True)
-        pad = draw.buffer(pad, 0.01
-                          , resolution=16
-                          , cap_style=CAP_STYLE.round
-                          , join_style=JOIN_STYLE.round
-                          , overwrite=False) #JK
-        # pad = draw.scale(pad, xfact=(1/(1+0.01)), yfact=(1/(1+0.01)))
-
-        # def buffer(qgeometry,
-        #    distance: float,
-        #    resolution=None,
-        #    cap_style=CAP_STYLE.flat,
-        #    join_style=JOIN_STYLE.mitre,
-        #    mitre_limit=None,
-        #    overwrite=False):
-        ########################################    
-        
         pad_top = draw.translate(pad, 0, +(pad_height + pad_gap) / 2.)
         pad_bot = draw.translate(pad, 0, -(pad_height + pad_gap) / 2.)
 
@@ -209,13 +198,14 @@ class TransmonPocket6(BaseQubit):
         [rect_jj, pad_top, pad_bot, rect_pk] = polys
 
         # Use the geometry to create Metal qgeometry
-        self.add_qgeometry('poly', dict(pad_top=pad_top, pad_bot=pad_bot))
-        self.add_qgeometry('poly', dict(rect_pk=rect_pk), subtract=True)
+        self.add_qgeometry('poly', dict(pad_top=pad_top, pad_bot=pad_bot), chip=chip)
+        self.add_qgeometry('poly', dict(rect_pk=rect_pk), subtract=True, chip=chip)
         # self.add_qgeometry('poly', dict(
         #     rect_jj=rect_jj), helper=True)
         self.add_qgeometry('junction',
                            dict(rect_jj=rect_jj),
-                           width=p.inductor_width)
+                           width=p.inductor_width,
+                           chip=chip)
 
     def make_connection_pads(self):
         """Makes standard transmon in a pocket."""
@@ -232,6 +222,9 @@ class TransmonPocket6(BaseQubit):
         # self.p allows us to directly access parsed values (string -> numbers) form the user option
         p = self.p
         pc = self.p.connection_pads[name]  # parser on connector options
+
+        # extract chip name
+        chip = p.chip
 
         # define commonly used variables once
         cpw_width = pc.cpw_width
@@ -291,12 +284,13 @@ class TransmonPocket6(BaseQubit):
                                        [p.pos_x, p.pos_y])
         [connector_pad, connector_wire_path] = objects
 
-        self.add_qgeometry('poly', {f'{name}_connector_pad': connector_pad})
+        self.add_qgeometry('poly', {f'{name}_connector_pad': connector_pad}, chip=chip)
         self.add_qgeometry('path', {f'{name}_wire': connector_wire_path},
-                           width=cpw_width)
+                           width=cpw_width, chip=chip)
         self.add_qgeometry('path', {f'{name}_wire_sub': connector_wire_path},
                            width=cpw_width + 2 * pc.cpw_gap,
-                           subtract=True)
+                           subtract=True,
+                           chip=chip)
 
         ############################################################
 
@@ -305,4 +299,5 @@ class TransmonPocket6(BaseQubit):
         self.add_pin(name,
                      points=points[-2:],
                      width=cpw_width,
-                     input_as_norm=True)
+                     input_as_norm=True,
+                     chip=chip)

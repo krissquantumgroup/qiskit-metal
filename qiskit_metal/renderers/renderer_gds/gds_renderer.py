@@ -1437,6 +1437,9 @@ class QGDSRenderer(QRenderer):
 
         path_sub_df = sub_df[sub_df.geometry.apply(
             lambda x: isinstance(x, shapely.geometry.linestring.LineString))]
+        
+        path_sub_df = self.render_fillet(path_sub_df) # added by JK
+
         path_sub_geo = path_sub_df['geometry'].tolist()
         path_sub_width = path_sub_df['width'].tolist()
         #for n in range(len(path_sub_geo)):
@@ -1480,6 +1483,146 @@ class QGDSRenderer(QRenderer):
             # <class 'shapely.geometry.multipolygon.MultiPolygon'>
             return combo_shapely
         return None  # Need explicitly to avoid lint warnings.
+
+    ########################################## start of modification ###############################
+    # Three functions(render_fillet, fillet_path, _calc_fillet) are copied from mpl_renderer.py
+    # Only fillet_path function got modified among three functions.
+    
+    def render_fillet(self, table):
+        """Renders fillet path.
+        Args:
+            table (DataFrame): Table of elements with fillets
+        Returns:
+            DataFrame table with geometry field updated with a polygon filleted path.
+        """
+        table['geometry'] = table.apply(self.fillet_path, axis=1)
+        return table
+    
+    def fillet_path(self, row):
+        """Output the filleted path.
+        Args:
+            row (DataFrame): Row to fillet.
+        Returns:
+            Polygon of the new filleted path.
+        """
+        from qiskit_metal.toolbox_python.utility_functions import bad_fillet_idxs
+        
+        path = row["geometry"].coords
+        if len(path) <= 2:  # only start and end points, no need to fillet
+            return row["geometry"]
+        newpath = np.array([path[0]])
+
+        # Get list of vertices that can't be filleted
+        no_fillet = bad_fillet_idxs(path, row["fillet"],
+                                    self.design.template_options.PRECISION)
+
+        # Iterate through every three-vertex corner
+        for (i, (start, corner, end)) in enumerate(zip(path, path[1:],
+                                                       path[2:])):
+            if i + 1 in no_fillet:  # don't fillet this corner
+                newpath = np.concatenate((newpath, np.array([corner])))
+            else:
+                # fillet = self._calc_fillet(np.array(start), np.array(corner),
+                #                            np.array(end), row["fillet"],
+                #                            int(self.options['resolution']))
+
+                
+                fillet = self._calc_fillet(np.array(start), np.array(corner),
+                                           np.array(end), row["fillet"]
+                                           )  # added by JK
+
+                if fillet is not False:
+                    newpath = np.concatenate((newpath, fillet))
+                else:
+                    newpath = np.concatenate((newpath, np.array([corner])))
+        newpath = np.concatenate((newpath, np.array([end])))
+
+        return LineString(newpath)
+    
+    def _calc_fillet(self,
+                     vertex_start,
+                     vertex_corner,
+                     vertex_end,
+                     radius,
+                     points=90): # changed from 16 to 90, JK
+        """Returns the filleted path based on the start, corner, and end
+        vertices and the fillet radius.
+        Args:
+            vertex_start (np.ndarray): x-y coordinates of starting vertex.
+            vertex_corner (np.ndarray): x-y coordinates of corner vertex.
+            vertex_end (np.ndarray): x-y coordinates of end vertex.
+            radius (float): Fillet radius.
+            points (int): Number of points to draw in the fillet corner.
+        """
+        # Start, corner, and end vertices must be distinct
+        if np.array_equal(vertex_start, vertex_corner) or np.array_equal(
+                vertex_end, vertex_corner):
+            return False
+
+        # Vectors pointing from corner to start and end vertices, respectively
+        # Also calculate their lengths and unit vectors
+        sc_vec = vertex_start - vertex_corner
+        ec_vec = vertex_end - vertex_corner
+        sc_norm = np.linalg.norm(sc_vec)
+        ec_norm = np.linalg.norm(ec_vec)
+        sc_uvec = sc_vec / sc_norm
+        ec_uvec = ec_vec / ec_norm
+
+        # Angle between previous unit vectors
+        end_angle = np.arccos(np.dot(sc_uvec, ec_uvec))
+
+        # Start, corner, and end vertices can't be collinear
+        if (end_angle == 0) or (end_angle == np.pi):
+            return False
+
+        # Fillet circle must be small enough to fit inside corner
+        if radius / np.tan(end_angle / 2) > min(sc_norm, ec_norm):
+            return False
+
+        # Unit vector pointing from corner vertex to center of fillet circle
+        net_uvec = (sc_uvec + ec_uvec) / np.linalg.norm(sc_uvec + ec_uvec)
+
+        # Coordinates of center of fillet circle
+        circle_center = vertex_corner + net_uvec * radius / np.sin(
+            end_angle / 2)
+
+        # Deltas represent displacement from corner vertex to circle center
+        # Midpoint angle from circle center to corner, wrt to horizontal extending from former
+        # Note: arctan is fine for angles in range (-pi / 2, pi / 2] but needs extra pi factor otherwise
+        delta_x = vertex_corner[0] - circle_center[0]
+        delta_y = vertex_corner[1] - circle_center[1]
+        if delta_x:
+            theta_mid = np.arctan(delta_y / delta_x) + np.pi * int(delta_x < 0)
+        else:
+            theta_mid = np.pi * ((1 - 2 * int(delta_y < 0)) + int(delta_y < 0))
+
+        # Start and end sweep angles determined relative to midpoint angle
+        # Swap them as needed to resolve ambiguity in arctan
+        theta_start = theta_mid - (np.pi - end_angle) / 2
+        theta_end = theta_mid + (np.pi - end_angle) / 2
+        p1 = circle_center + radius * np.array(
+            [np.cos(theta_start), np.sin(theta_start)])
+        p2 = circle_center + radius * np.array(
+            [np.cos(theta_end), np.sin(theta_end)])
+        if np.linalg.norm(vertex_start - p2) < np.linalg.norm(vertex_start -
+                                                              p1):
+            theta_start, theta_end = theta_end, theta_start
+
+        # Populate the fillet corner, skipping the start point since it's already added
+        path = np.array([
+            circle_center + radius * np.array(
+                [np.cos(theta_start), np.sin(theta_start)])
+        ])
+        for theta in np.linspace(theta_start, theta_end, points)[1:]:
+            path = np.concatenate(
+                (path,
+                 np.array([
+                     circle_center + radius *
+                     np.array([np.cos(theta), np.sin(theta)])
+                 ])))
+        return path
+    
+    ################################## end of modification ####################################
 
     def _get_rectangle_points(self, chip_name: str) -> Tuple[list, list]:
         """There can be more than one chip in QGeometry. All chips export to

@@ -393,7 +393,7 @@ def extract_transmon_coupled_Noscillator(capMatrix,
         print(qubit_index, bus_index)
         print('Predicted Values')
         print('')
-        print('Transmon Properties')
+        print('**Transmon Properties**')
         print('f_Q %f [GHz]' % ham_dict['fQ'])
         print('EC %f [MHz]' % ham_dict['EC'])
         print('EJ %f [GHz]' % ham_dict['EJ'])
@@ -412,7 +412,8 @@ def extract_transmon_coupled_Noscillator(capMatrix,
             print('1/T1bus%d %f [Hz]' % (ii + 1, 1 / T1bus[ii] / (2 * np.pi)))
             print('T1bus%d %f [us]' % (ii + 1, T1bus[ii] / (1e-6)))
 
-        print('Bus-Bus Couplings')
+        print('\n')
+        print('**Bus-Bus Couplings**')
         for ii in range(N):
             for jj in range(ii + 1, N):
                 print('gbus%d_%d %f [MHz]' % (ii + 1, jj + 1, gbusbus[ii, jj] /
